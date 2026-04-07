@@ -14,6 +14,9 @@ load_dotenv()
 STORAGE_PATH = os.getenv("STORAGE_PATH", "./uploads")
 os.makedirs(STORAGE_PATH, exist_ok=True)
 
+# CORS: aceita origens do .env ou permite tudo em dev
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,13 +31,12 @@ app = FastAPI(title="FORJA3D API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: restringir em produção
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Routers primeiro
 app.include_router(generate.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(payment.router, prefix="/api")

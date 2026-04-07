@@ -1,4 +1,7 @@
 import asyncio
+import io
+import os
+
 import trimesh
 import numpy as np
 
@@ -6,43 +9,36 @@ import numpy as np
 class MeshRepairService:
     """Reparo de malha 3D com trimesh."""
 
-    # Densidades em g/cm³
     DENSIDADES = {
         "PLA": 1.24,
         "PETG": 1.27,
         "TPU": 1.21,
     }
 
-    async def repair(self, input_path: str, output_path: str) -> dict:
+    async def repair_from_bytes(self, glb_bytes: bytes) -> tuple[bytes, dict]:
         """
-        Repara malha GLB: fix_normals, fill_holes, watertight check.
-        Retorna dict com volume_cm3, is_watertight e bounding_box.
+        Repara malha GLB a partir de bytes em memória.
+        Retorna (glb_reparado_bytes, mesh_info).
         """
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._repair_sync, input_path, output_path)
+        return await loop.run_in_executor(None, self._repair_bytes_sync, glb_bytes)
 
-    def _repair_sync(self, input_path: str, output_path: str) -> dict:
-        scene = trimesh.load(input_path)
+    async def repair(self, input_path: str, output_path: str) -> dict:
+        """Repara malha GLB de arquivo para arquivo."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._repair_file_sync, input_path, output_path)
 
-        # Se for uma cena com múltiplas meshes, combina em uma só
-        if isinstance(scene, trimesh.Scene):
-            mesh = scene.dump(concatenate=True)
-        else:
-            mesh = scene
+    def _load_mesh(self, data):
+        """Carrega e combina meshes de uma cena ou mesh única."""
+        if isinstance(data, trimesh.Scene):
+            return data.dump(concatenate=True)
+        return data
 
-        # Reparos
-        trimesh.repair.fix_normals(mesh)
-        trimesh.repair.fill_holes(mesh)
-        trimesh.repair.fix_winding(mesh)
-
-        # Métricas (volume em cm³, assumindo unidades em mm do GLB)
+    def _get_metrics(self, mesh) -> dict:
+        """Extrai métricas da malha."""
         volume_mm3 = abs(mesh.volume) if mesh.is_watertight else abs(mesh.convex_hull.volume)
-        volume_cm3 = volume_mm3 / 1000.0  # mm³ → cm³
-
-        bounding_box = mesh.bounding_box.extents.tolist()  # [x, y, z] em mm
-
-        # Salva arquivo reparado
-        mesh.export(output_path)
+        volume_cm3 = volume_mm3 / 1000.0
+        bounding_box = mesh.bounding_box.extents.tolist()
 
         return {
             "volume_cm3": round(volume_cm3, 2),
@@ -50,21 +46,43 @@ class MeshRepairService:
             "bounding_box_mm": [round(d, 1) for d in bounding_box],
         }
 
+    def _repair_mesh(self, mesh):
+        """Aplica reparos na malha."""
+        trimesh.repair.fix_normals(mesh)
+        trimesh.repair.fill_holes(mesh)
+        trimesh.repair.fix_winding(mesh)
+        return mesh
+
+    def _repair_bytes_sync(self, glb_bytes: bytes) -> tuple[bytes, dict]:
+        scene = trimesh.load(io.BytesIO(glb_bytes), file_type="glb")
+        mesh = self._load_mesh(scene)
+        mesh = self._repair_mesh(mesh)
+        metrics = self._get_metrics(mesh)
+
+        output = io.BytesIO()
+        mesh.export(output, file_type="glb")
+        return output.getvalue(), metrics
+
+    def _repair_file_sync(self, input_path: str, output_path: str) -> dict:
+        scene = trimesh.load(input_path)
+        mesh = self._load_mesh(scene)
+        mesh = self._repair_mesh(mesh)
+        metrics = self._get_metrics(mesh)
+        mesh.export(output_path)
+        return metrics
+
     def estimate_weight(self, volume_cm3: float, material: str) -> float:
         """Estima peso em gramas baseado no volume e densidade do material."""
         densidade = self.DENSIDADES.get(material, 1.24)
-        # Infill de ~20% típico
         return round(volume_cm3 * densidade * 0.20, 1)
 
     def estimate_print_time(self, volume_cm3: float) -> float:
-        """Estima tempo de impressão em horas (aproximação simples)."""
-        # ~10 cm³/h para velocidade média da X1 Carbon
+        """Estima tempo de impressão em horas."""
         return round(max(volume_cm3 / 10.0, 0.5), 1)
 
     def check_dimensions(self, bounding_box_mm: list[float], escala: float = 1.0) -> bool:
         """Verifica se cabe no volume da X1 Carbon (256x256x256mm)."""
-        max_dim = 256.0
-        return all(d * escala <= max_dim for d in bounding_box_mm)
+        return all(d * escala <= 256.0 for d in bounding_box_mm)
 
 
 mesh_service = MeshRepairService()
