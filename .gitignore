@@ -1,0 +1,45 @@
+# Dependências
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.production
+
+# Build
+.next/
+out/
+dist/
+build/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads e arquivos gerados
+uploads/
+*.glb
+*.3mf
+*.stl
+
+# SQLite
+*.db
+*.db-journal
+
+# Logs
+*.log
+
+# Vercel
+.vercel/
+.claude/
