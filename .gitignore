@@ -46,3 +46,6 @@ uploads/
 
 # Worktrees
 .worktrees/
+
+# Printer-agent local config (contains credentials)
+printer-agent/config.json

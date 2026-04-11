@@ -1,0 +1,11 @@
+{
+  "printer": {
+    "ip": "192.168.1.100",
+    "serial": "SERIAL_DA_IMPRESSORA",
+    "access_code": "ACCESS_CODE_AQUI"
+  },
+  "backend_url": "http://localhost:8000",
+  "agent_password": "DEFINIR_IGUAL_AO_BACKEND_ENV",
+  "poll_interval_seconds": 30,
+  "bambu_studio_cli": "C:\\Program Files\\Bambu Studio\\bambu-studio.exe"
+}
