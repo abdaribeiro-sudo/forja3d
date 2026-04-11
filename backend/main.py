@@ -6,10 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
-from database import engine
-from routers import generate, orders, payment, shipping, admin, price, printer
-
+# IMPORTANTE: carregar .env ANTES dos imports de routers.
+# Os routers avaliam os.getenv(...) no nível do módulo (ex: ADMIN_PASSWORD,
+# AGENT_PASSWORD), então se load_dotenv rodasse depois as constantes já estariam
+# congeladas com os valores default.
 load_dotenv()
+
+from database import engine  # noqa: E402
+from routers import generate, orders, payment, shipping, admin, price, printer  # noqa: E402
 
 STORAGE_PATH = os.getenv("STORAGE_PATH", "./uploads")
 os.makedirs(STORAGE_PATH, exist_ok=True)
