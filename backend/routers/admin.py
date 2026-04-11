@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.tables import Order
+from services.notifier import notifier
 
 router = APIRouter(tags=["admin"])
 
@@ -91,12 +92,17 @@ async def admin_update_order(
     if not order:
         return {"success": False, "data": None, "error": "Pedido não encontrado."}
 
+    old_status = order.status
     if request.status:
         order.status = request.status
     if request.codigo_rastreio is not None:
         order.codigo_rastreio = request.codigo_rastreio
 
     await db.commit()
+    await db.refresh(order)
+
+    if old_status != "ENVIADO" and order.status == "ENVIADO" and order.codigo_rastreio:
+        await notifier.send_shipped(order)
 
     return {
         "success": True,

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.state_machine import TransitionError, assert_allowed
 from models.tables import Order
+from services.notifier import notifier
 
 router = APIRouter(tags=["printer"], prefix="/printer")
 
@@ -129,6 +130,12 @@ async def update_status(
 
     await db.commit()
     await db.refresh(order)
+
+    if req.status == "IMPRIMINDO":
+        await notifier.send_print_started(order)
+    elif req.status == "IMPRESSO":
+        await notifier.send_print_finished(order)
+
     return {"success": True, "data": _order_to_dict(order), "error": None}
 
 
@@ -183,5 +190,6 @@ async def report_error(
     order.erro_em = datetime.utcnow()
     await db.commit()
     await db.refresh(order)
+    await notifier.send_print_error(order)
 
     return {"success": True, "data": _order_to_dict(order), "error": None}

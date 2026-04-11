@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.tables import Order
 from services.mercadopago import mp_service
+from services.notifier import notifier
 
 router = APIRouter(tags=["payment"])
 
@@ -75,6 +76,8 @@ async def payment_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                     order.status = "PAGO"
                     order.mp_payment_id = payment_id
                     await db.commit()
+                    await db.refresh(order)
+                    await notifier.send_payment_received(order)
 
         return {"success": True, "data": {"received": True}, "error": None}
     except Exception as e:
