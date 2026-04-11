@@ -158,3 +158,30 @@ async def update_progress(
 
     await db.commit()
     return {"success": True, "data": {"updated": True}, "error": None}
+
+
+class ErroRequest(BaseModel):
+    agent_password: str
+    mensagem: str
+
+
+@router.post("/orders/{order_id}/erro")
+async def report_error(
+    order_id: str,
+    req: ErroRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    verify_agent(req.agent_password)
+
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+
+    order.status = "ERRO_IMPRESSAO"
+    order.erro_mensagem = req.mensagem[:2000]  # trunca
+    order.erro_em = datetime.utcnow()
+    await db.commit()
+    await db.refresh(order)
+
+    return {"success": True, "data": _order_to_dict(order), "error": None}
