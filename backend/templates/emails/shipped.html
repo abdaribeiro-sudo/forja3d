@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="font-size:24px;margin:0 0 16px;">Seu pedido foi postado</h1>
+<p>Oi {{ order.nome }}, acabamos de postar sua peça nos Correios.</p>
+<p>Código de rastreio: <strong style="font-family:'Space Mono',monospace;color:#4ECDC4;">{{ order.codigo_rastreio }}</strong></p>
+<p>Prazo estimado: <strong>{{ order.prazo_dias }} dias úteis</strong></p>
+<p style="margin-top:24px;">
+  <a href="https://rastreamento.correios.com.br/app/index.php?objeto={{ order.codigo_rastreio }}" style="display:inline-block;padding:12px 24px;background:linear-gradient(90deg,#4ECDC4,#44B09E);color:#000;font-weight:700;border-radius:12px;text-decoration:none;">
+    Rastrear nos Correios
+  </a>
+</p>
+{% endblock %}

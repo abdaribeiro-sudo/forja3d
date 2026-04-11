@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="font-size:24px;margin:0 0 16px;">Tivemos um contratempo</h1>
+<p>Oi {{ order.nome }},</p>
+<p>Tivemos um problema com a impressão da sua peça. Nossa equipe já foi notificada e vamos reimprimir sua peça sem nenhum custo adicional.</p>
+<p>Em breve você receberá outro email quando a reimpressão começar.</p>
+<p style="margin-top:24px;">
+  <a href="{{ frontend_url }}/pedido/{{ order.id }}" style="display:inline-block;padding:12px 24px;background:linear-gradient(90deg,#4ECDC4,#44B09E);color:#000;font-weight:700;border-radius:12px;text-decoration:none;">
+    Ver pedido
+  </a>
+</p>
+{% endblock %}

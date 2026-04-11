@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="font-size:24px;margin:0 0 16px;">Sua peça está pronta!</h1>
+<p>Oi {{ order.nome }}, terminamos de imprimir sua peça.</p>
+<p>Agora vamos embalar e enviar pelos Correios. Você receberá o código de rastreio assim que postarmos.</p>
+<p style="margin-top:24px;">
+  <a href="{{ frontend_url }}/pedido/{{ order.id }}" style="display:inline-block;padding:12px 24px;background:linear-gradient(90deg,#4ECDC4,#44B09E);color:#000;font-weight:700;border-radius:12px;text-decoration:none;">
+    Ver pedido
+  </a>
+</p>
+{% endblock %}

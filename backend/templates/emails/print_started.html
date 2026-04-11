@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="font-size:24px;margin:0 0 16px;">Sua peça entrou na impressora</h1>
+<p>Oi {{ order.nome }}, a impressão da sua peça começou agora.</p>
+<p>Você pode acompanhar o progresso em tempo real na página do pedido.</p>
+<p>Tempo estimado: <strong>{{ "%.1f"|format(order.tempo_impressao_horas) }}h</strong></p>
+<p style="margin-top:24px;">
+  <a href="{{ frontend_url }}/pedido/{{ order.id }}" style="display:inline-block;padding:12px 24px;background:linear-gradient(90deg,#4ECDC4,#44B09E);color:#000;font-weight:700;border-radius:12px;text-decoration:none;">
+    Ver progresso
+  </a>
+</p>
+{% endblock %}
