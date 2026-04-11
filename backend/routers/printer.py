@@ -130,3 +130,31 @@ async def update_status(
     await db.commit()
     await db.refresh(order)
     return {"success": True, "data": _order_to_dict(order), "error": None}
+
+
+class ProgressUpdateRequest(BaseModel):
+    agent_password: str
+    percentual: int
+    camada_atual: int
+    camada_total: int
+
+
+@router.post("/orders/{order_id}/progress")
+async def update_progress(
+    order_id: str,
+    req: ProgressUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    verify_agent(req.agent_password)
+
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+
+    order.progresso_percentual = req.percentual
+    order.camada_atual = req.camada_atual
+    order.camada_total = req.camada_total
+
+    await db.commit()
+    return {"success": True, "data": {"updated": True}, "error": None}
