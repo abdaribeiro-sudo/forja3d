@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +26,10 @@ class UpdateOrderRequest(BaseModel):
     password: str
     status: Optional[str] = None
     codigo_rastreio: Optional[str] = None
+
+
+class RequeueRequest(BaseModel):
+    password: str
 
 
 @router.post("/admin/login")
@@ -97,5 +101,44 @@ async def admin_update_order(
     return {
         "success": True,
         "data": {"id": order.id, "status": order.status, "codigo_rastreio": order.codigo_rastreio},
+        "error": None,
+    }
+
+
+@router.post("/admin/orders/{order_id}/requeue")
+async def admin_requeue_order(
+    order_id: str,
+    request: RequeueRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    if not verify_admin(request.password):
+        return {"success": False, "data": None, "error": "Não autorizado."}
+
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+
+    if order.status != "ERRO_IMPRESSAO":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Só é possível reenfileirar pedidos em ERRO_IMPRESSAO (status atual: {order.status})",
+        )
+
+    order.status = "PAGO"
+    order.progresso_percentual = None
+    order.camada_atual = None
+    order.camada_total = None
+    order.erro_mensagem = None
+    order.erro_em = None
+    order.impressao_iniciada_em = None
+    order.impressao_concluida_em = None
+    order.arquivo_3mf_path = None
+
+    await db.commit()
+    await db.refresh(order)
+    return {
+        "success": True,
+        "data": {"id": order.id, "status": order.status},
         "error": None,
     }
