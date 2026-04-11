@@ -117,6 +117,13 @@ async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
             "total_centavos": order.preco_centavos + order.frete_centavos,
             "prazo_dias": order.prazo_dias,
             "codigo_rastreio": order.codigo_rastreio,
+            "progresso_percentual": order.progresso_percentual,
+            "camada_atual": order.camada_atual,
+            "camada_total": order.camada_total,
+            "erro_mensagem": None,  # não expor erro bruto pro cliente
+            "impressao_iniciada_em": order.impressao_iniciada_em.isoformat() if order.impressao_iniciada_em else None,
+            "impressao_concluida_em": order.impressao_concluida_em.isoformat() if order.impressao_concluida_em else None,
+            "tempo_impressao_horas": order.tempo_impressao_horas,
             "created_at": order.created_at.isoformat() if order.created_at else None,
         },
         "error": None,
