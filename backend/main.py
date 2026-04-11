@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
-from database import engine, Base
+from database import engine
 from routers import generate, orders, payment, shipping, admin, price
 
 load_dotenv()
@@ -20,9 +20,8 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        from models.tables import Order, Generation  # noqa: F401
-        await conn.run_sync(Base.metadata.create_all)
+    # Migrations são aplicadas via `alembic upgrade head` no start command.
+    # Não chamamos Base.metadata.create_all aqui.
     yield
     await engine.dispose()
 
