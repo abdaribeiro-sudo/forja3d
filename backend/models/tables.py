@@ -43,6 +43,20 @@ class Order(Base):
     mp_payment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     mp_preference_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
+    # Progresso em tempo real
+    progresso_percentual: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    camada_atual: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    camada_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Erro (preenchido quando ERRO_IMPRESSAO)
+    erro_mensagem: Mapped[str | None] = mapped_column(Text, nullable=True)
+    erro_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Rastreabilidade da impressão
+    impressao_iniciada_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    impressao_concluida_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    arquivo_3mf_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
