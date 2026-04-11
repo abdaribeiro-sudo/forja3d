@@ -1,48 +1,55 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { apiGet, apiPost } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { apiGet, apiPost, Order, OrderStatus } from "@/lib/api";
 import { formatarPreco, formatarData } from "@/lib/utils";
-
-interface OrderItem {
-  id: string;
-  nome: string;
-  email: string;
-  status: string;
-  material: string;
-  peso_gramas: number;
-  preco_centavos: number;
-  frete_centavos: number;
-  total_centavos: number;
-  codigo_rastreio: string | null;
-  created_at: string | null;
-}
 
 const statusColors: Record<string, string> = {
   AGUARDANDO_PAGAMENTO: "bg-yellow-500/20 text-yellow-400",
   PAGO: "bg-blue-500/20 text-blue-400",
+  PREPARANDO: "bg-sky-500/20 text-sky-400",
   IMPRIMINDO: "bg-purple-500/20 text-purple-400",
+  IMPRESSO: "bg-indigo-500/20 text-indigo-400",
   EMBALANDO: "bg-orange-500/20 text-orange-400",
   ENVIADO: "bg-teal/20 text-teal",
   ENTREGUE: "bg-green-500/20 text-green-400",
+  ERRO_IMPRESSAO: "bg-amber-500/20 text-amber-400",
 };
 
-const statusOrder = [
+const STATUS_FILTERS: (OrderStatus | "TODOS")[] = [
+  "TODOS",
   "AGUARDANDO_PAGAMENTO",
   "PAGO",
+  "PREPARANDO",
   "IMPRIMINDO",
+  "IMPRESSO",
   "EMBALANDO",
   "ENVIADO",
   "ENTREGUE",
+  "ERRO_IMPRESSAO",
+];
+
+const statusOrder: OrderStatus[] = [
+  "AGUARDANDO_PAGAMENTO",
+  "PAGO",
+  "PREPARANDO",
+  "IMPRIMINDO",
+  "IMPRESSO",
+  "EMBALANDO",
+  "ENVIADO",
+  "ENTREGUE",
+  "ERRO_IMPRESSAO",
 ];
 
 export default function AdminPage() {
+  const router = useRouter();
   const [autenticado, setAutenticado] = useState(false);
   const [senha, setSenha] = useState("");
   const [erroAuth, setErroAuth] = useState(false);
-  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filtroStatus, setFiltroStatus] = useState<string>("TODOS");
+  const [filtroStatus, setFiltroStatus] = useState<OrderStatus | "TODOS">("TODOS");
 
   const [editando, setEditando] = useState<string | null>(null);
   const [novoStatus, setNovoStatus] = useState("");
@@ -84,7 +91,7 @@ export default function AdminPage() {
   async function loadOrders() {
     setLoading(true);
     const pwd = localStorage.getItem("admin_password") || senha;
-    const res = await apiGet<OrderItem[]>(
+    const res = await apiGet<Order[]>(
       `/api/admin/orders?password=${encodeURIComponent(pwd)}`
     );
     if (res.success && res.data) {
@@ -242,15 +249,15 @@ export default function AdminPage() {
         )}
 
         {/* Filtros */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          {["TODOS", ...statusOrder].map((s) => (
+        <div className="flex flex-wrap gap-2 mb-6 overflow-x-auto pb-2">
+          {STATUS_FILTERS.map((s) => (
             <button
               key={s}
               onClick={() => setFiltroStatus(s)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                 filtroStatus === s
-                  ? "bg-teal/20 text-teal"
-                  : "bg-white/[0.05] text-gray-400 hover:text-white"
+                  ? "bg-[#4ECDC4] text-black"
+                  : "bg-white/[0.05] text-gray-400 hover:bg-white/10 hover:text-white"
               }`}
             >
               {s.replace(/_/g, " ")}
@@ -277,13 +284,19 @@ export default function AdminPage() {
             {filteredOrders.map((order) => (
               <div
                 key={order.id}
-                className="p-4 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:border-white/[0.12] transition-colors"
+                onClick={() => router.push(`/admin/pedido/${order.id}`)}
+                className={`p-4 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:border-white/[0.12] transition-colors cursor-pointer ${
+                  order.status === "ERRO_IMPRESSAO"
+                    ? "border-l-4 border-amber-400 bg-amber-400/5"
+                    : ""
+                }`}
               >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-1">
                       <a
                         href={`/pedido/${order.id}`}
+                        onClick={(e) => e.stopPropagation()}
                         className="font-mono text-teal text-sm hover:underline"
                       >
                         #{order.id.slice(0, 8)}
@@ -295,6 +308,11 @@ export default function AdminPage() {
                       >
                         {order.status.replace(/_/g, " ")}
                       </span>
+                      {order.status === "IMPRIMINDO" && order.progresso_percentual !== null && (
+                        <span className="font-mono text-xs text-purple-300">
+                          {order.progresso_percentual}%
+                        </span>
+                      )}
                     </div>
                     <div className="text-sm text-gray-400 truncate">
                       <span className="text-white">{order.nome}</span>
@@ -305,6 +323,11 @@ export default function AdminPage() {
                       <span className="mx-2">·</span>
                       <span className="font-mono">{formatarPreco(order.total_centavos)}</span>
                     </div>
+                    {order.erro_mensagem && order.status === "ERRO_IMPRESSAO" && (
+                      <p className="text-xs text-amber-400/80 mt-1 truncate">
+                        Erro: {order.erro_mensagem}
+                      </p>
+                    )}
                     {order.codigo_rastreio && (
                       <p className="text-xs text-gray-500 mt-1">
                         Rastreio:{" "}
@@ -319,7 +342,7 @@ export default function AdminPage() {
                   </div>
 
                   {editando === order.id ? (
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <select
                         value={novoStatus}
                         onChange={(e) => setNovoStatus(e.target.value)}
@@ -354,7 +377,8 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setEditando(order.id);
                         setNovoStatus(order.status);
                         setNovoRastreio(order.codigo_rastreio || "");
