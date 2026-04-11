@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -7,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from models.state_machine import TransitionError, assert_allowed
 from models.tables import Order
 
 router = APIRouter(tags=["printer"], prefix="/printer")
@@ -95,4 +97,36 @@ async def claim_next_job(
     await db.commit()
     await db.refresh(order)
 
+    return {"success": True, "data": _order_to_dict(order), "error": None}
+
+
+class StatusUpdateRequest(BaseModel):
+    agent_password: str
+    status: Literal["IMPRIMINDO", "IMPRESSO"]
+
+
+@router.post("/orders/{order_id}/status")
+async def update_status(
+    order_id: str,
+    req: StatusUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    verify_agent(req.agent_password)
+
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+
+    try:
+        assert_allowed(order.status, req.status)
+    except TransitionError as e:
+        raise HTTPException(status_code=400, detail=f"Transição ilegal: {e}")
+
+    order.status = req.status
+    if req.status == "IMPRESSO":
+        order.impressao_concluida_em = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(order)
     return {"success": True, "data": _order_to_dict(order), "error": None}
