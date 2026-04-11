@@ -65,6 +65,8 @@ forja3d/
 - Preços sempre em centavos no backend, formatados no frontend
 - Todos os endpoints REST retornam JSON: { success: bool, data: any, error: string | null }
 - Usar async/await em todo o backend (httpx, SQLAlchemy async)
+- Antes de commitar, rodar `git diff --cached | grep -iE 'secret|token|password|api.?key'` pra garantir que nenhum valor sensível foi staged
+- `backend/.env` e `printer-agent/config.json` NUNCA devem ser commitados (ambos já estão no `.gitignore`)
 
 ## Design do frontend
 - Tema escuro (#0a0a0a fundo), acentos teal (#4ECDC4, #44B09E)
@@ -109,6 +111,18 @@ preco_final = custo_total × 1.8  # margem de 80%
 14. Impressora imprime → agent monitora progresso via MQTT
 15. Peça pronta → embala → envia pelos Correios → atualiza tracking
 
+## Estados do pedido (state machine)
+
+```
+PAGO → PREPARANDO → IMPRIMINDO → IMPRESSO → EMBALANDO → ENVIADO → ENTREGUE
+                         ↓
+                  ERRO_IMPRESSAO → (admin requeue) → PAGO
+```
+
+- **PAGO → IMPRESSO:** automático via printer-agent (MQTT + bambulabs-api)
+- **IMPRESSO → ENTREGUE:** manual via `/admin/pedido/[id]`
+- **ERRO_IMPRESSAO:** qualquer falha na parte automática; admin reenfileira via botão
+
 ## API Tencent Cloud Hunyuan 3D
 - Endpoint: usar SDK oficial tencentcloud-sdk-python
 - Região: ap-singapore
@@ -134,6 +148,18 @@ preco_final = custo_total × 1.8  # margem de 80%
 - TENCENT_SECRET_KEY
 - MP_ACCESS_TOKEN
 - CORREIOS_CEP_ORIGEM=28035030
-- DATABASE_URL=sqlite:///./forja3d.db
+- DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/forja3d
 - ADMIN_PASSWORD
 - STORAGE_PATH=./uploads
+
+## Migrações (Alembic)
+
+O backend usa Alembic pra gerenciar schema do Postgres.
+
+Comandos principais:
+- Criar migration a partir do schema atual: `cd backend && alembic revision --autogenerate -m "descrição"`
+- Aplicar migrations: `cd backend && alembic upgrade head`
+- Reverter última migration: `cd backend && alembic downgrade -1`
+- Ver estado atual: `cd backend && alembic current`
+
+Em produção (Railway), o start command roda `alembic upgrade head` antes do `uvicorn`.
