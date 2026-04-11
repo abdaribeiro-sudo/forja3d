@@ -1,6 +1,10 @@
+import asyncio
+import json
 import os
 
+import asyncpg
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -143,3 +147,79 @@ async def list_orders(db: AsyncSession = Depends(get_db)):
         ],
         "error": None,
     }
+
+
+@router.get("/orders/{order_id}/stream")
+async def stream_order(order_id: str, db: AsyncSession = Depends(get_db)):
+    """Server-Sent Events: snapshot + updates em tempo real."""
+    # Primeiro busca o snapshot atual
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        return {"success": False, "data": None, "error": "Pedido não encontrado."}
+
+    # Serializa snapshot (sem expor erro_mensagem cru ao cliente)
+    snapshot = {
+        "id": order.id,
+        "nome": order.nome,
+        "status": order.status,
+        "material": order.material,
+        "escala": order.escala,
+        "peso_gramas": order.peso_gramas,
+        "preco_centavos": order.preco_centavos,
+        "frete_centavos": order.frete_centavos,
+        "total_centavos": order.preco_centavos + order.frete_centavos,
+        "prazo_dias": order.prazo_dias,
+        "codigo_rastreio": order.codigo_rastreio,
+        "progresso_percentual": order.progresso_percentual,
+        "camada_atual": order.camada_atual,
+        "camada_total": order.camada_total,
+        "erro_mensagem": None,  # não expor erro bruto pro cliente
+        "impressao_iniciada_em": order.impressao_iniciada_em.isoformat() if order.impressao_iniciada_em else None,
+        "impressao_concluida_em": order.impressao_concluida_em.isoformat() if order.impressao_concluida_em else None,
+        "tempo_impressao_horas": order.tempo_impressao_horas,
+        "created_at": order.created_at.isoformat() if order.created_at else None,
+    }
+
+    terminal_states = {"IMPRESSO", "ERRO_IMPRESSAO", "ENVIADO", "ENTREGUE"}
+
+    async def event_generator():
+        # Snapshot inicial
+        yield f"event: snapshot\ndata: {json.dumps(snapshot)}\n\n"
+
+        if snapshot["status"] in terminal_states:
+            yield f'event: closed\ndata: {{"reason": "terminal_state"}}\n\n'
+            return
+
+        # Conecta direto ao Postgres (fora do SQLAlchemy) pra usar LISTEN
+        raw_dsn = os.getenv("DATABASE_URL", "").replace("postgresql+asyncpg://", "postgresql://")
+        conn = await asyncpg.connect(raw_dsn)
+        queue: asyncio.Queue = asyncio.Queue()
+
+        def _listener(_conn, _pid, _channel, payload):
+            queue.put_nowait(payload)
+
+        channel = f"order_{order_id}"
+        await conn.add_listener(channel, _listener)
+
+        try:
+            while True:
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=30.0)
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
+                    continue
+
+                data = json.loads(payload)
+                # Remove campos sensíveis
+                data.pop("erro_mensagem", None)
+                yield f"event: update\ndata: {json.dumps(data)}\n\n"
+
+                if data.get("status") in terminal_states:
+                    yield f'event: closed\ndata: {{"reason": "terminal_state"}}\n\n'
+                    return
+        finally:
+            await conn.remove_listener(channel, _listener)
+            await conn.close()
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
