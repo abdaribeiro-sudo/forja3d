@@ -43,3 +43,6 @@ uploads/
 # Vercel
 .vercel/
 .claude/
+
+# Worktrees
+.worktrees/
