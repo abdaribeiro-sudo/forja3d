@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 from database import engine
-from routers import generate, orders, payment, shipping, admin, price
+from routers import generate, orders, payment, shipping, admin, price, printer
 
 load_dotenv()
 
@@ -42,6 +42,7 @@ app.include_router(payment.router, prefix="/api")
 app.include_router(shipping.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(price.router, prefix="/api")
+app.include_router(printer.router, prefix="/api")
 
 
 @app.get("/api/health")
