@@ -1,47 +1,20 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
-import { apiGet } from "@/lib/api";
-import { formatarPreco } from "@/lib/utils";
+import { useParams } from "next/navigation";
+
 import OrderTracker from "@/components/OrderTracker";
+import { useOrderStream } from "@/lib/hooks/useOrderStream";
+import { formatarPreco } from "@/lib/utils";
 
-interface OrderData {
-  id: string;
-  nome: string;
-  status: string;
-  material: string;
-  preco_centavos: number;
-  frete_centavos: number;
-  total_centavos: number;
-  prazo_dias: number;
-  codigo_rastreio: string | null;
-  created_at: string | null;
-}
-
-export default function PedidoPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const [order, setOrder] = useState<OrderData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    apiGet<OrderData>(`/api/orders/${id}`).then((res) => {
-      if (res.success && res.data) setOrder(res.data);
-      setLoading(false);
-    });
-  }, [id]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-teal/30 border-t-teal rounded-full animate-spin" />
-      </div>
-    );
-  }
+export default function PedidoPage() {
+  const params = useParams<{ id: string }>();
+  const orderId = params?.id ?? null;
+  const { order } = useOrderStream(orderId);
 
   if (!order) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-400">
-        Pedido não encontrado.
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-teal/30 border-t-teal rounded-full animate-spin" />
       </div>
     );
   }
@@ -52,7 +25,7 @@ export default function PedidoPage({ params }: { params: Promise<{ id: string }>
         <h1 className="text-4xl font-bold mb-2">Pedido</h1>
         <p className="text-gray-400 font-mono mb-10">#{order.id.slice(0, 8)}</p>
 
-        <OrderTracker status={order.status} codigoRastreio={order.codigo_rastreio ?? undefined} />
+        <OrderTracker order={order} />
 
         <div className="mt-8 p-6 rounded-2xl border border-white/[0.08] bg-white/[0.02]">
           <h3 className="font-semibold mb-4">Detalhes</h3>
