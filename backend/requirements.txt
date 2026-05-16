@@ -9,7 +9,9 @@ pydantic>=2.10.0
 trimesh>=4.5.0
 numpy>=2.2.0
 mercadopago>=2.2.2
-tencentcloud-sdk-python>=3.0.1270
+# Conta Tencent Cloud International -> Hunyuan 3D fica no namespace `hunyuan`
+# v20230901 (SDK intl-en), NAO no `ai3d` (mainland). Ver services/hunyuan.py.
+tencentcloud-sdk-python-intl-en>=3.1.96
 alembic>=1.13.0
 resend>=2.5.0
 jinja2>=3.1.0
