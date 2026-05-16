@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import require_password
 from database import get_db
 from models.state_machine import TransitionError, assert_allowed
 from models.tables import Order
@@ -14,7 +15,7 @@ from services.notifier import notifier
 
 router = APIRouter(tags=["printer"], prefix="/printer")
 
-AGENT_PASSWORD = os.getenv("AGENT_PASSWORD", "dev_agent_password")
+AGENT_PASSWORD = require_password("AGENT_PASSWORD")
 ORPHAN_PREPARING_MINUTES = int(os.getenv("ORPHAN_PREPARING_MINUTES", "45"))
 
 

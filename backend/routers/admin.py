@@ -1,4 +1,3 @@
-import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -6,13 +5,14 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import require_password
 from database import get_db
 from models.tables import Order
 from services.notifier import notifier
 
 router = APIRouter(tags=["admin"])
 
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+ADMIN_PASSWORD = require_password("ADMIN_PASSWORD")
 
 
 def verify_admin(password: str) -> bool:
