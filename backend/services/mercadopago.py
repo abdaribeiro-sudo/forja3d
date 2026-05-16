@@ -16,6 +16,23 @@ class MercadoPagoService:
             self._sdk = mercadopago.SDK(self.access_token)
         return self._sdk
 
+    @staticmethod
+    def _unwrap(result: dict, contexto: str) -> dict:
+        """Valida a resposta do MP e expõe o erro real.
+
+        O SDK do Mercado Pago não levanta exceção em erro HTTP — devolve
+        {"status": 4xx, "response": {"message": ...}}. Sem isso, o caller
+        fazia response["id"] e estourava um KeyError 'id' opaco.
+        """
+        status = result.get("status")
+        response = result.get("response") or {}
+        if status is None or status >= 400 or "error" in response:
+            msg = response.get("message") or response.get("error") or "erro desconhecido"
+            raise RuntimeError(
+                f"Mercado Pago falhou em {contexto} (HTTP {status}): {msg}"
+            )
+        return response
+
     async def criar_preferencia(
         self, order_id: str, valor_centavos: int, descricao: str, email: str
     ) -> dict:
@@ -39,21 +56,29 @@ class MercadoPagoService:
                 "installments": 6,
             },
             "external_reference": order_id,
-            "notification_url": os.getenv("MP_WEBHOOK_URL", ""),
             "back_urls": {
                 "success": f"{frontend_url}/pedido/{order_id}",
                 "failure": f"{frontend_url}/checkout?order_id={order_id}&error=1",
                 "pending": f"{frontend_url}/pedido/{order_id}",
             },
-            "auto_return": "approved",
         }
+
+        # auto_return só é aceito pelo MP quando a success URL é pública HTTPS;
+        # com localhost/http o MP responde 400 invalid_auto_return.
+        if frontend_url.startswith("https://"):
+            preference_data["auto_return"] = "approved"
+
+        # MP rejeita notification_url vazia — só envia se houver webhook configurado.
+        webhook_url = os.getenv("MP_WEBHOOK_URL", "").strip()
+        if webhook_url:
+            preference_data["notification_url"] = webhook_url
 
         # SDK do Mercado Pago é síncrono — executa em thread separada
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             None, lambda: sdk.preference().create(preference_data)
         )
-        response = result["response"]
+        response = self._unwrap(result, "criar preferência")
 
         return {
             "preference_id": response["id"],
@@ -68,7 +93,7 @@ class MercadoPagoService:
         result = await loop.run_in_executor(
             None, lambda: sdk.payment().get(payment_id)
         )
-        response = result["response"]
+        response = self._unwrap(result, "verificar pagamento")
 
         return {
             "payment_id": str(response["id"]),
